@@ -19,6 +19,20 @@ bool ChallengeModes::challengeEnabledForPlayer(ChallengeModeSettings setting, Pl
     return player->GetPlayerSetting("mod-challenge-modes", setting).value;
 }
 
+bool ChallengeModes::challengeEnabledCheckbyToken(ChallengeModeSettings setting, Player* player) const
+{
+    const int Hardcore_token_item = 90002;
+
+    if (!enabled() || !challengeEnabled(setting))
+    {
+        return false;
+    }
+    // 通过角色是否拥有Token物品进行相关判断
+    return player->HasItemCount(Hardcore_token_item, 1, true);
+}
+
+
+
 bool ChallengeModes::challengeEnabled(ChallengeModeSettings setting) const
 {
     switch (setting)
@@ -223,7 +237,7 @@ public:
 
     void OnLevelChanged(Player* player, uint8 /*oldlevel*/) override
     {
-        if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
+        if (!sChallengeModes->challengeEnabledCheckbyToken(settingName, player))
         {
             return;
         }
@@ -265,15 +279,43 @@ class ChallengeMode_Hardcore : public ChallengeMode
 public:
     ChallengeMode_Hardcore() : ChallengeMode("ChallengeMode_Hardcore", SETTING_HARDCORE) {}
 
+    const std::string Hardcore_ban_time = "9999999s";
+
+
+    void OnPlayerReleasedGhost(Player* player) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return;
+        }
+        ChatHandler(player->GetSession()).PSendSysMessage("You're journey is now over!!!");
+
+        std::string PlayerName;
+        PlayerName = player->GetName();
+        std::string bantime;
+        sBan->BanCharacter(PlayerName, Hardcore_ban_time, "Failed to chanlledge Hardcore", "Server");
+
+
+        std::string plr = player->GetName();
+        std::string tag_colour = "7bbef7";
+        std::string plr_colour = "ff0000";
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " Player |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
+            " 挑战失败，角色将永久无法登录.|r";
+        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+    }
+
     void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
     {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
             return;
         }
         // A better implementation is to not allow the resurrect but this will need a new hook added first
-        player->KillPlayer();
+        //player->KillPlayer();
     }
+
 
     void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
     {
@@ -283,6 +325,82 @@ public:
     void OnLevelChanged(Player* player, uint8 oldlevel) override
     {
         ChallengeMode::OnLevelChanged(player, oldlevel);
+    }
+
+    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+    {
+
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+
+        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
+    }
+
+    bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+        // Are there any exceptions in WotLK? If so need to be added here
+        return false;
+    }
+
+
+    bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+        // Do not allow using elixir, potion, or flask
+        if ((proto->Class == ITEM_CLASS_CONSUMABLE) &&
+            ((proto->SubClass == ITEM_SUBCLASS_POTION) ||
+                (proto->SubClass == ITEM_SUBCLASS_ELIXIR) ||
+                (proto->SubClass == ITEM_SUBCLASS_FLASK)))
+        {
+            return false;
+        }
+
+        // Do not allow food that gives food buffs
+        if (proto->Class == ITEM_CLASS_CONSUMABLE && proto->SubClass == ITEM_SUBCLASS_FOOD)
+        {
+            for (const auto& Spell : proto->Spells)
+            {
+                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(Spell.SpellId);
+                if (!spellInfo)
+                    continue;
+
+                for (uint8 i = 0; i < 3; i++)
+                {
+                    if (spellInfo->Effects[i].ApplyAuraName == SPELL_AURA_PERIODIC_TRIGGER_SPELL)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    bool CanGroupInvite(Player* player, std::string& /*membername*/) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    bool CanGroupAccept(Player* player, Group* /*group*/) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+        return false;
     }
 };
 
@@ -447,7 +565,7 @@ public:
             return;
         }
         // A better implementation is to not allow the resurrect but this will need a new hook added first
-        player->KillPlayer();
+        player->KillPlayer();        
     }
 
     void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
@@ -611,7 +729,9 @@ public:
     {
         if (sChallengeModes->challengeEnabled(SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Enable Hardcore Mode", 0, SETTING_HARDCORE);
+            //AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Enable Hardcore Mode", 0, SETTING_HARDCORE);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_HARDCORE, "选择开启硬核挑战模式，系统将销毁当前已装备的各种装备。\n你确定要继续吗？\n\n",0, false);
+            //AddGossipItemFor(player, GOSSIP_ICON_MONEY_BAG, "|TInterface/ICONS/INV_Misc_Statue_02:30:30:-18:0|t使用此配置", EQUIPMENT_SLOT_END + 5, action, "使用此配置会绑定幻化效果到装备，装备由此将不能交易。\n你确定要继续吗？\n\n" + sT->presetByName[player->GetGUID()][action], 0, false);
         }
         if (sChallengeModes->challengeEnabled(SETTING_SEMI_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
         {
@@ -648,7 +768,33 @@ public:
     bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 /*sender*/, uint32 action) override
     {
         player->UpdatePlayerSetting("mod-challenge-modes", action, 1);
-        ChatHandler(player->GetSession()).PSendSysMessage("Challenge enabled.");
+        ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式开启。");
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            player->AddItem(90002, 1);
+
+            for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
+            {
+                if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                {
+                    if (pItem->GetTemplate() && !pItem->IsEquipped())
+                        continue;
+                    uint8 slot = pItem->GetSlot();
+                    player->RemoveItem(INVENTORY_SLOT_BAG_0, slot, true);
+                }
+            }
+
+
+        }
+        std::string plr = player->GetName();
+        std::string tag_colour = "7bbef7";
+        std::string plr_colour = "ff0000";
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " Player |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
+            " 开启硬核挑战模式，祝好运！|r";
+        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+
         CloseGossipMenuFor(player);
         return true;
     }

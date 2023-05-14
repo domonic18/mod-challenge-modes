@@ -729,9 +729,7 @@ public:
     {
         if (sChallengeModes->challengeEnabled(SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
         {
-            //AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Enable Hardcore Mode", 0, SETTING_HARDCORE);
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_HARDCORE, "选择开启硬核挑战模式，系统将销毁当前已装备的各种装备。\n你确定要继续吗？\n\n",0, false);
-            //AddGossipItemFor(player, GOSSIP_ICON_MONEY_BAG, "|TInterface/ICONS/INV_Misc_Statue_02:30:30:-18:0|t使用此配置", EQUIPMENT_SLOT_END + 5, action, "使用此配置会绑定幻化效果到装备，装备由此将不能交易。\n你确定要继续吗？\n\n" + sT->presetByName[player->GetGUID()][action], 0, false);
         }
         if (sChallengeModes->challengeEnabled(SETTING_SEMI_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
         {
@@ -767,6 +765,8 @@ public:
 
     bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 /*sender*/, uint32 action) override
     {
+        if (player->GetGroup() != NULL)
+            return false;
         player->UpdatePlayerSetting("mod-challenge-modes", action, 1);
         ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式开启。");
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))

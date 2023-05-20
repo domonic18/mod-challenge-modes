@@ -257,6 +257,16 @@ public:
             std::string tNameLink = handler.GetNameLink(player);
             std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
             player->SetTitle(titleInfo);
+
+            std::string plr = player->GetName();
+            std::string tag_colour = "7bbef7";
+            std::string plr_colour = "ffff00";
+            std::ostringstream stream;
+            stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+                " 角色 |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
+                " 完成 " << static_cast<int>(level) << "级硬核挑战，获得" << "|r|cff" << plr_colour << titleNameStr << "|r|cff" << tag_colour <<
+                " 头衔奖励，恭喜！|r";
+            sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
         }
         if (mapContainsKey(talentRewardMap, level))
         {
@@ -268,6 +278,10 @@ public:
             uint32 itemEntry = itemRewardMap->at(level);
             player->SendItemRetrievalMail({ { itemEntry, 1 } });
         }
+
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_completed (character_guid, character_level, achievement, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), player->getLevel(), "", player->GetTotalPlayedTime());
     }
 
 private:
@@ -282,13 +296,14 @@ public:
     const std::string Hardcore_ban_time = "9999999s";
 
 
+
+
     void OnPlayerReleasedGhost(Player* player) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
             return;
         }
-        ChatHandler(player->GetSession()).PSendSysMessage("You're journey is now over!!!");
 
         std::string PlayerName;
         PlayerName = player->GetName();
@@ -296,14 +311,45 @@ public:
         sBan->BanCharacter(PlayerName, Hardcore_ban_time, "Failed to chanlledge Hardcore", "Server");
 
 
-        std::string plr = player->GetName();
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), player->getLevel(), "death", player->GetTotalPlayedTime());
+
+    }
+
+    void OnPlayerKilledByCreature(Creature* killer, Player* player) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
+        {
+            return;
+        }
+
+
+        std::string playername = player->GetName();
+        uint8 playerlevel = player->getLevel();
+        uint8 playerGUID = player->GetGUID().GetCounter();
+
+        std::string killername = killer->GetNameForLocaleIdx(sObjectMgr->GetDBCLocaleIndex());
+        uint8 killerlevel = killer->getLevel();
+
+        uint8 totalplayertime = player->GetTotalPlayedTime();
+        uint8 minutes = totalplayertime / 60;
+        uint8 hours = minutes / 60;
+        uint8 days = hours / 24;
+        minutes %= 60;
+        hours %= 24;
+
         std::string tag_colour = "7bbef7";
-        std::string plr_colour = "ff0000";
+        std::string plr_colour = "ffff00";
         std::ostringstream stream;
         stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " Player |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
-            " 挑战失败，角色将永久无法登录.|r";
+            " 角色 |r|cff" << plr_colour << playername << "[" << static_cast<int>(playerlevel) << "]级" << " |r|cff" << tag_colour <<
+            " 被" <<
+            " 生物 |r|cff" << plr_colour << killername << "[" << static_cast<int>(killerlevel) << "]级" << " |r|cff" << tag_colour <<
+            " 所杀，硬核挑战失败，角色生存时间：|r" << " |r|cff" << plr_colour << static_cast<int>(days) << "天" << static_cast<int>(hours) << "小时" << static_cast<int>(minutes) << "分钟";
         sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+
+
     }
 
     void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
@@ -313,7 +359,7 @@ public:
             return;
         }
         // A better implementation is to not allow the resurrect but this will need a new hook added first
-        //player->KillPlayer();
+        player->KillPlayer();
     }
 
 
@@ -338,6 +384,16 @@ public:
         return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
     }
 
+    bool CanInitTrade(Player* player, Player* target) override
+    {
+        if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            return true;
+        }
+        return false;
+    }
+
+
     bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
@@ -348,18 +404,18 @@ public:
         return false;
     }
 
-
     bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
             return true;
         }
+        //return !(proto->Class == ITEM_CLASS_CONSUMABLE && proto->SubClass == ITEM_SUBCLASS_FLASK);
+
+
         // Do not allow using elixir, potion, or flask
         if ((proto->Class == ITEM_CLASS_CONSUMABLE) &&
-            ((proto->SubClass == ITEM_SUBCLASS_POTION) ||
-                (proto->SubClass == ITEM_SUBCLASS_ELIXIR) ||
-                (proto->SubClass == ITEM_SUBCLASS_FLASK)))
+            (proto->SubClass == ITEM_SUBCLASS_POTION || proto->SubClass == ITEM_SUBCLASS_ELIXIR || proto->SubClass == ITEM_SUBCLASS_FLASK))
         {
             return false;
         }
@@ -788,10 +844,10 @@ public:
         }
         std::string plr = player->GetName();
         std::string tag_colour = "7bbef7";
-        std::string plr_colour = "ff0000";
+        std::string plr_colour = "ffff00";
         std::ostringstream stream;
         stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " Player |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
             " 开启硬核挑战模式，祝好运！|r";
         sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 

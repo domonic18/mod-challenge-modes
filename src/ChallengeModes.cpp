@@ -305,15 +305,25 @@ public:
             return;
         }
 
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({},'{}', {}, {}, {}, {}, '{}',{})",
+            player->GetGUID().GetCounter(),  player->getLevel(), "death", player->GetTotalPlayedTime());
+
+
+        std::string playername = player->GetName();
+
+        std::string tag_colour = "7bbef7";
+        std::string plr_colour = "ffff00";
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
+            " 挑战失败，但失败并不意味着结束，它只是一个新的起点，祝越来越好！"  ;
+        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+
         std::string PlayerName;
         PlayerName = player->GetName();
         std::string bantime;
         sBan->BanCharacter(PlayerName, Hardcore_ban_time, "Failed to chanlledge Hardcore", "Server");
-
-
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->getLevel(), "death", player->GetTotalPlayedTime());
 
     }
 
@@ -346,7 +356,7 @@ public:
             " 角色 |r|cff" << plr_colour << playername << "[" << static_cast<int>(playerlevel) << "]级" << " |r|cff" << tag_colour <<
             " 被" <<
             " 生物 |r|cff" << plr_colour << killername << "[" << static_cast<int>(killerlevel) << "]级" << " |r|cff" << tag_colour <<
-            " 所杀，硬核挑战失败，角色生存时间：|r" << " |r|cff" << plr_colour << static_cast<int>(days) << "天" << static_cast<int>(hours) << "小时" << static_cast<int>(minutes) << "分钟";
+            " 所杀，角色生存时间：|r" << " |r|cff" << plr_colour << static_cast<int>(days) << "天" << static_cast<int>(hours) << "小时" << static_cast<int>(minutes) << "分钟";
         sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 
 

@@ -14,5 +14,5 @@ INSERT INTO `item_template` (`entry`, `class`, `subclass`, `SoundOverrideSubclas
 
 DELETE FROM `item_loot_template` WHERE (`Entry` = 90004);
 INSERT INTO `item_loot_template` (`Entry`, `Item`, `Reference`, `Chance`, `QuestRequired`, `LootMode`, `GroupId`, `MinCount`, `MaxCount`, `Comment`) VALUES
-(90004, 90003, 0, 100, 0, 1, 0, 25, 25, ''),
+(90004, 90003, 0, 100, 0, 1, 0, 10, 10, ''),
 (90004, 90005, 0, 100, 0, 1, 0, 1, 1, '');

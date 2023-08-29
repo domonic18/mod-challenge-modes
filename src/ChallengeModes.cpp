@@ -305,9 +305,10 @@ public:
             return;
         }
 
+
         CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({},'{}', {}, {}, {}, {}, '{}',{})",
-            player->GetGUID().GetCounter(),  player->getLevel(), "death", player->GetTotalPlayedTime());
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), player->getLevel(), "death", player->GetTotalPlayedTime());
 
 
         std::string playername = player->GetName();

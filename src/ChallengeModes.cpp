@@ -376,6 +376,11 @@ public:
 
     void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
     {
+        if (sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
+        {
+            player->RemoveAura(90000);      //移除双倍经验的效果
+        }
+        
         ChallengeMode::OnGiveXP(player, amount, victim);
     }
 
@@ -405,13 +410,30 @@ public:
     }
 
 
-    bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+    bool CanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
             return true;
         }
         // Are there any exceptions in WotLK? If so need to be added here
+        //
+        uint32 enchantId = uint32(item->GetEnchantmentId(slot));
+        LOG_INFO("module", "GetEnchantmentId  is {} .", item->GetEnchantmentId(slot));
+
+        int enchantIds[] = { 1666,2,12,524,1667,1668,2635,3782,3783,3784,       //冰封武器1~9级
+                             5,4,3,523,1665,1666,2634,3779,3780,3781,           //火舌武器1~9级
+                             1,6,29,3032,                                       //石化武器1~4级
+                             283,284,525,1669,2636,3785,3786,3787               //风怒武器1~9级
+             };
+        int size = sizeof(enchantIds) / sizeof(enchantIds[0]);
+
+        for (int i = 0; i < size; i++) {
+            if (enchantId == enchantIds[i]) {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -422,7 +444,7 @@ public:
             return true;
         }
         //return !(proto->Class == ITEM_CLASS_CONSUMABLE && proto->SubClass == ITEM_SUBCLASS_FLASK);
-
+        //LOG_INFO("module", "proto->Class  is {} ;  proto->SubClass  is  {}", proto->Class, proto->SubClass);
 
         // Do not allow using elixir, potion, or flask
         if ((proto->Class == ITEM_CLASS_CONSUMABLE) &&
@@ -471,301 +493,301 @@ public:
     }
 };
 
-class ChallengeMode_SemiHardcore : public ChallengeMode
-{
-public:
-    ChallengeMode_SemiHardcore() : ChallengeMode("ChallengeMode_SemiHardcore", SETTING_SEMI_HARDCORE) {}
-
-    void OnPlayerKilledByCreature(Creature* /*killer*/, Player* player) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SEMI_HARDCORE, player))
-        {
-            return;
-        }
-        for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
-        {
-            if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-            {
-                if (pItem->GetTemplate() && !pItem->IsEquipped())
-                    continue;
-                uint8 slot = pItem->GetSlot();
-                ChatHandler(player->GetSession()).PSendSysMessage("|cffDA70D6You have lost your |cffffffff|Hitem:%d:0:0:0:0:0:0:0:0|h[%s]|h|r", pItem->GetEntry(), pItem->GetTemplate()->Name1.c_str());
-                player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
-            }
-        }
-        player->SetMoney(0);
-    }
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_SelfCrafted : public ChallengeMode
-{
-public:
-    ChallengeMode_SelfCrafted() : ChallengeMode("ChallengeMode_SelfCrafted", SETTING_SELF_CRAFTED) {}
-
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SELF_CRAFTED, player))
-        {
-            return true;
-        }
-        if (!pItem->GetTemplate()->HasSignature())
-        {
-            return false;
-        }
-        return pItem->GetGuidValue(ITEM_FIELD_CREATOR) == player->GetGUID();
-    }
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_ItemQualityLevel : public ChallengeMode
-{
-public:
-    ChallengeMode_ItemQualityLevel() : ChallengeMode("ChallengeMode_ItemQualityLevel", SETTING_ITEM_QUALITY_LEVEL) {}
-
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_ITEM_QUALITY_LEVEL, player))
-        {
-            return true;
-        }
-        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
-    }
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_SlowXpGain : public ChallengeMode
-{
-public:
-    ChallengeMode_SlowXpGain() : ChallengeMode("ChallengeMode_SlowXpGain", SETTING_SLOW_XP_GAIN) {}
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_VerySlowXpGain : public ChallengeMode
-{
-public:
-    ChallengeMode_VerySlowXpGain() : ChallengeMode("ChallengeMode_VerySlowXpGain", SETTING_VERY_SLOW_XP_GAIN) {}
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_QuestXpOnly : public ChallengeMode
-{
-public:
-    ChallengeMode_QuestXpOnly() : ChallengeMode("ChallengeMode_QuestXpOnly", SETTING_QUEST_XP_ONLY) {}
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_QUEST_XP_ONLY, player))
-        {
-            return;
-        }
-        if (victim)
-        {
-            amount = 0;
-        }
-        else
-        {
-            ChallengeMode::OnGiveXP(player, amount, victim);
-        }
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-};
-
-class ChallengeMode_IronMan : public ChallengeMode
-{
-public:
-    ChallengeMode_IronMan() : ChallengeMode("ChallengeMode_IronMan", SETTING_IRON_MAN) {}
-
-    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return;
-        }
-        // A better implementation is to not allow the resurrect but this will need a new hook added first
-        player->KillPlayer();        
-    }
-
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
-    {
-        ChallengeMode::OnGiveXP(player, amount, victim);
-    }
-
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return;
-        }
-        player->SetFreeTalentPoints(0); // Remove all talent points
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-
-    void OnTalentsReset(Player* player, bool /*noCost*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return;
-        }
-        player->SetFreeTalentPoints(0); // Remove all talent points
-    }
-
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return true;
-        }
-        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
-    }
-
-    bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return true;
-        }
-        // Are there any exceptions in WotLK? If so need to be added here
-        return false;
-    }
-
-    void OnLearnSpell(Player* player, uint32 spellID) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return;
-        }
-        // These professions are class skills so they are always acceptable
-        switch (spellID)
-        {
-            case RUNEFORGING:
-            case POISONS:
-            case BEAST_TRAINING:
-                return;
-            default:
-                break;
-        }
-        // Do not allow learning any trade skills
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellID);
-        if (!spellInfo)
-            return;
-        bool shouldForget = false;
-        for (uint8 i = 0; i < 3; i++)
-        {
-            if (spellInfo->Effects[i].Effect == SPELL_EFFECT_TRADE_SKILL)
-            {
-                shouldForget = true;
-            }
-        }
-        if (shouldForget)
-        {
-            player->removeSpell(spellID, SPEC_MASK_ALL, false);
-        }
-    }
-
-    bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return true;
-        }
-        // Do not allow using elixir, potion, or flask
-        if (proto->Class == ITEM_CLASS_CONSUMABLE &&
-                (proto->SubClass == ITEM_SUBCLASS_POTION ||
-                proto->SubClass == ITEM_SUBCLASS_ELIXIR ||
-                proto->SubClass == ITEM_SUBCLASS_FLASK))
-        {
-            return false;
-        }
-        // Do not allow food that gives food buffs
-        if (proto->Class == ITEM_CLASS_CONSUMABLE && proto->SubClass == ITEM_SUBCLASS_FOOD)
-        {
-            for (const auto & Spell : proto->Spells)
-            {
-                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(Spell.SpellId);
-                if (!spellInfo)
-                    continue;
-
-                for (uint8 i = 0; i < 3; i++)
-                {
-                    if (spellInfo->Effects[i].ApplyAuraName == SPELL_AURA_PERIODIC_TRIGGER_SPELL)
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
-
-    bool CanGroupInvite(Player* player, std::string& /*membername*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool CanGroupAccept(Player* player, Group* /*group*/) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return true;
-        }
-        return false;
-    }
-
-};
+//class ChallengeMode_SemiHardcore : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_SemiHardcore() : ChallengeMode("ChallengeMode_SemiHardcore", SETTING_SEMI_HARDCORE) {}
+//
+//    void OnPlayerKilledByCreature(Creature* /*killer*/, Player* player) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SEMI_HARDCORE, player))
+//        {
+//            return;
+//        }
+//        for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
+//        {
+//            if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+//            {
+//                if (pItem->GetTemplate() && !pItem->IsEquipped())
+//                    continue;
+//                uint8 slot = pItem->GetSlot();
+//                ChatHandler(player->GetSession()).PSendSysMessage("|cffDA70D6You have lost your |cffffffff|Hitem:%d:0:0:0:0:0:0:0:0|h[%s]|h|r", pItem->GetEntry(), pItem->GetTemplate()->Name1.c_str());
+//                player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+//            }
+//        }
+//        player->SetMoney(0);
+//    }
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_SelfCrafted : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_SelfCrafted() : ChallengeMode("ChallengeMode_SelfCrafted", SETTING_SELF_CRAFTED) {}
+//
+//    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SELF_CRAFTED, player))
+//        {
+//            return true;
+//        }
+//        if (!pItem->GetTemplate()->HasSignature())
+//        {
+//            return false;
+//        }
+//        return pItem->GetGuidValue(ITEM_FIELD_CREATOR) == player->GetGUID();
+//    }
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_ItemQualityLevel : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_ItemQualityLevel() : ChallengeMode("ChallengeMode_ItemQualityLevel", SETTING_ITEM_QUALITY_LEVEL) {}
+//
+//    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_ITEM_QUALITY_LEVEL, player))
+//        {
+//            return true;
+//        }
+//        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
+//    }
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_SlowXpGain : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_SlowXpGain() : ChallengeMode("ChallengeMode_SlowXpGain", SETTING_SLOW_XP_GAIN) {}
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_VerySlowXpGain : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_VerySlowXpGain() : ChallengeMode("ChallengeMode_VerySlowXpGain", SETTING_VERY_SLOW_XP_GAIN) {}
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_QuestXpOnly : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_QuestXpOnly() : ChallengeMode("ChallengeMode_QuestXpOnly", SETTING_QUEST_XP_ONLY) {}
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_QUEST_XP_ONLY, player))
+//        {
+//            return;
+//        }
+//        if (victim)
+//        {
+//            amount = 0;
+//        }
+//        else
+//        {
+//            ChallengeMode::OnGiveXP(player, amount, victim);
+//        }
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//};
+//
+//class ChallengeMode_IronMan : public ChallengeMode
+//{
+//public:
+//    ChallengeMode_IronMan() : ChallengeMode("ChallengeMode_IronMan", SETTING_IRON_MAN) {}
+//
+//    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return;
+//        }
+//        // A better implementation is to not allow the resurrect but this will need a new hook added first
+//        player->KillPlayer();        
+//    }
+//
+//    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+//    {
+//        ChallengeMode::OnGiveXP(player, amount, victim);
+//    }
+//
+//    void OnLevelChanged(Player* player, uint8 oldlevel) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return;
+//        }
+//        player->SetFreeTalentPoints(0); // Remove all talent points
+//        ChallengeMode::OnLevelChanged(player, oldlevel);
+//    }
+//
+//    void OnTalentsReset(Player* player, bool /*noCost*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return;
+//        }
+//        player->SetFreeTalentPoints(0); // Remove all talent points
+//    }
+//
+//    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return true;
+//        }
+//        return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
+//    }
+//
+//    bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return true;
+//        }
+//        // Are there any exceptions in WotLK? If so need to be added here
+//        return false;
+//    }
+//
+//    void OnLearnSpell(Player* player, uint32 spellID) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return;
+//        }
+//        // These professions are class skills so they are always acceptable
+//        switch (spellID)
+//        {
+//            case RUNEFORGING:
+//            case POISONS:
+//            case BEAST_TRAINING:
+//                return;
+//            default:
+//                break;
+//        }
+//        // Do not allow learning any trade skills
+//        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellID);
+//        if (!spellInfo)
+//            return;
+//        bool shouldForget = false;
+//        for (uint8 i = 0; i < 3; i++)
+//        {
+//            if (spellInfo->Effects[i].Effect == SPELL_EFFECT_TRADE_SKILL)
+//            {
+//                shouldForget = true;
+//            }
+//        }
+//        if (shouldForget)
+//        {
+//            player->removeSpell(spellID, SPEC_MASK_ALL, false);
+//        }
+//    }
+//
+//    bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return true;
+//        }
+//        // Do not allow using elixir, potion, or flask
+//        if (proto->Class == ITEM_CLASS_CONSUMABLE &&
+//                (proto->SubClass == ITEM_SUBCLASS_POTION ||
+//                proto->SubClass == ITEM_SUBCLASS_ELIXIR ||
+//                proto->SubClass == ITEM_SUBCLASS_FLASK))
+//        {
+//            return false;
+//        }
+//        // Do not allow food that gives food buffs
+//        if (proto->Class == ITEM_CLASS_CONSUMABLE && proto->SubClass == ITEM_SUBCLASS_FOOD)
+//        {
+//            for (const auto & Spell : proto->Spells)
+//            {
+//                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(Spell.SpellId);
+//                if (!spellInfo)
+//                    continue;
+//
+//                for (uint8 i = 0; i < 3; i++)
+//                {
+//                    if (spellInfo->Effects[i].ApplyAuraName == SPELL_AURA_PERIODIC_TRIGGER_SPELL)
+//                    {
+//                        return false;
+//                    }
+//                }
+//            }
+//        }
+//        return true;
+//    }
+//
+//    bool CanGroupInvite(Player* player, std::string& /*membername*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return true;
+//        }
+//        return false;
+//    }
+//
+//    bool CanGroupAccept(Player* player, Group* /*group*/) override
+//    {
+//        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+//        {
+//            return true;
+//        }
+//        return false;
+//    }
+//
+//};
 
 class gobject_challenge_modes : public GameObjectScript
 {
@@ -878,11 +900,11 @@ void AddSC_mod_challenge_modes()
     new ChallengeModes_WorldScript();
     new gobject_challenge_modes();
     new ChallengeMode_Hardcore();
-    new ChallengeMode_SemiHardcore();
-    new ChallengeMode_SelfCrafted();
-    new ChallengeMode_ItemQualityLevel();
-    new ChallengeMode_SlowXpGain();
-    new ChallengeMode_VerySlowXpGain();
-    new ChallengeMode_QuestXpOnly();
-    new ChallengeMode_IronMan();
+    //new ChallengeMode_SemiHardcore();
+    //new ChallengeMode_SelfCrafted();
+    //new ChallengeMode_ItemQualityLevel();
+    //new ChallengeMode_SlowXpGain();
+    //new ChallengeMode_VerySlowXpGain();
+    //new ChallengeMode_QuestXpOnly();
+    //new ChallengeMode_IronMan();
 }

@@ -3,6 +3,9 @@
  */
 
 #include "ChallengeModes.h"
+#include "WorldSessionMgr.h"
+#include "BanMgr.h"
+#include "SpellMgr.h"
 
 ChallengeModes* ChallengeModes::instance()
 {
@@ -226,7 +229,7 @@ public:
         return (mapToCheck->find(key) != mapToCheck->end());
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* /*victim*/) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
         {
@@ -235,7 +238,7 @@ public:
         amount *= sChallengeModes->getXpBonusForChallenge(settingName);
     }
 
-    void OnLevelChanged(Player* player, uint8 /*oldlevel*/) override
+    void OnPlayerLevelChanged(Player* player, uint8 /*oldlevel*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(settingName, player))
         {
@@ -244,7 +247,7 @@ public:
         const std::unordered_map<uint8, uint32> *titleRewardMap = sChallengeModes->getTitleMapForChallenge(settingName);
         const std::unordered_map<uint8, uint32> *talentRewardMap = sChallengeModes->getTalentMapForChallenge(settingName);
         const std::unordered_map<uint8, uint32> *itemRewardMap = sChallengeModes->getItemMapForChallenge(settingName);
-        uint8 level = player->getLevel();
+        uint8 level = player->GetLevel();
         if (mapContainsKey(titleRewardMap, level))
         {
             CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(titleRewardMap->at(level));
@@ -255,7 +258,7 @@ public:
             }
             ChatHandler handler(player->GetSession());
             std::string tNameLink = handler.GetNameLink(player);
-            std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
+            std::string titleNameStr = player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()];
             player->SetTitle(titleInfo);
 
             std::string plr = player->GetName();
@@ -266,7 +269,7 @@ public:
                 " 角色 |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
                 " 完成 " << static_cast<int>(level) << "级硬核挑战，获得" << "|r|cff" << plr_colour << titleNameStr << "|r|cff" << tag_colour <<
                 " 头衔奖励，恭喜！|r";
-            sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
         }
         if (mapContainsKey(talentRewardMap, level))
         {
@@ -281,7 +284,7 @@ public:
 
         CharacterDatabase.Execute("INSERT INTO hardcore_challenge_completed (character_guid, character_level, achievement, total_spent_time) "
             "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->getLevel(), "", player->GetTotalPlayedTime());
+            player->GetGUID().GetCounter(), player->GetLevel(), "", player->GetTotalPlayedTime());
     }
 
 private:
@@ -293,7 +296,7 @@ class ChallengeMode_Hardcore : public ChallengeMode
 public:
     ChallengeMode_Hardcore() : ChallengeMode("ChallengeMode_Hardcore", SETTING_HARDCORE) {}
 
-    const std::string Hardcore_ban_time = "9999999s";
+    const std::string Hardcore_ban_time = "999999999s";
 
 
 
@@ -308,7 +311,7 @@ public:
 
         CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
             "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->getLevel(), "death", player->GetTotalPlayedTime());
+            player->GetGUID().GetCounter(), player->GetLevel(), "death", player->GetTotalPlayedTime());
 
 
         std::string playername = player->GetName();
@@ -319,7 +322,7 @@ public:
         stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
             " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
             " 挑战失败，但失败并不意味着结束，它只是一个新的起点，祝越来越好！"  ;
-        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 
         std::string PlayerName;
         PlayerName = player->GetName();
@@ -337,11 +340,11 @@ public:
 
 
         std::string playername = player->GetName();
-        uint8 playerlevel = player->getLevel();
+        uint8 playerlevel = player->GetLevel();
         uint8 playerGUID = player->GetGUID().GetCounter();
 
         std::string killername = killer->GetNameForLocaleIdx(sObjectMgr->GetDBCLocaleIndex());
-        uint8 killerlevel = killer->getLevel();
+        uint8 killerlevel = killer->GetLevel();
 
         uint8 totalplayertime = player->GetTotalPlayedTime();
         uint8 minutes = totalplayertime / 60;
@@ -358,7 +361,7 @@ public:
             " 被" <<
             " 生物 |r|cff" << plr_colour << killername << "[" << static_cast<int>(killerlevel) << "]级" << " |r|cff" << tag_colour <<
             " 所杀，角色生存时间：|r" << " |r|cff" << plr_colour << static_cast<int>(days) << "天" << static_cast<int>(hours) << "小时" << static_cast<int>(minutes) << "分钟";
-        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 
 
     }
@@ -374,22 +377,22 @@ public:
     }
 
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
         if (sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
             player->RemoveAura(90000);      //移除双倍经验的效果
         }
-        
-        ChallengeMode::OnGiveXP(player, amount, victim);
+
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+    bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
     {
 
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
@@ -400,7 +403,7 @@ public:
         return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
     }
 
-    bool CanInitTrade(Player* player, Player* target) override
+    bool OnPlayerCanInitTrade(Player* player, Player* target) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
@@ -410,7 +413,7 @@ public:
     }
 
 
-    bool CanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+    bool OnPlayerCanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
@@ -437,7 +440,7 @@ public:
         return false;
     }
 
-    bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
+    bool OnPlayerCanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
@@ -474,7 +477,7 @@ public:
         return true;
     }
 
-    bool CanGroupInvite(Player* player, std::string& /*membername*/) override
+    bool OnPlayerCanGroupInvite(Player* player, std::string& /*membername*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
@@ -483,7 +486,7 @@ public:
         return false;
     }
 
-    bool CanGroupAccept(Player* player, Group* /*group*/) override
+    bool OnPlayerCanGroupAccept(Player* player, Group* /*group*/) override
     {
         if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_HARDCORE, player))
         {
@@ -806,17 +809,26 @@ public:
 
         bool CanBeSeen(Player const* player) override
         {
-            if ((player->getLevel() > 1) || (player->getClass() == CLASS_DEATH_KNIGHT && player->getLevel() > 55))
+            // 禁止死亡骑士看到硬核模式神像
+            if (player->getClass() == CLASS_DEATH_KNIGHT)
             {
                 return false;
             }
+
+            // 其他职业只有1级角色可以看到神像
+            if (player->GetLevel() > 1)
+            {
+                return false;
+            }
+
             return sChallengeModes->enabled();
         }
     };
 
     bool OnGossipHello(Player* player, GameObject* go) override
     {
-        if (sChallengeModes->challengeEnabled(SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
+        // 禁止死亡骑士选择硬核模式
+        if (player->getClass() != CLASS_DEATH_KNIGHT && sChallengeModes->challengeEnabled(SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_HARDCORE) && !playerSettingEnabled(player, SETTING_SEMI_HARDCORE))
         {
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_HARDCORE, "选择开启硬核挑战模式，系统将销毁当前已装备的各种装备。\n你确定要继续吗？\n\n",0, false);
         }
@@ -882,7 +894,7 @@ public:
         stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
             " 角色 |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
             " 开启硬核挑战模式，祝好运！|r";
-        sWorld->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 
         CloseGossipMenuFor(player);
         return true;

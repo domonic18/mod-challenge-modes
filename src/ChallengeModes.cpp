@@ -6,6 +6,7 @@
 #include "WorldSessionMgr.h"
 #include "BanMgr.h"
 #include "SpellMgr.h"
+#include "StringFormat.h"
 
 ChallengeModes* ChallengeModes::instance()
 {
@@ -258,7 +259,7 @@ public:
             }
             ChatHandler handler(player->GetSession());
             std::string tNameLink = handler.GetNameLink(player);
-            std::string titleNameStr = player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()];
+            std::string titleNameStr = Acore::StringFormat(player->getGender() == GENDER_MALE ? titleInfo->nameMale[handler.GetSessionDbcLocale()] : titleInfo->nameFemale[handler.GetSessionDbcLocale()], player->GetName());
             player->SetTitle(titleInfo);
 
             std::string plr = player->GetName();

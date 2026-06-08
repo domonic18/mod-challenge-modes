@@ -489,7 +489,7 @@ public:
         sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
-    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
+    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool& /*applySickness*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
         {
@@ -701,7 +701,7 @@ class ChallengeMode_IronMan : public ChallengeMode
 public:
     ChallengeMode_IronMan() : ChallengeMode("ChallengeMode_IronMan", SETTING_IRON_MAN) {}
 
-    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool /*applySickness*/) override
+    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool& /*applySickness*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {

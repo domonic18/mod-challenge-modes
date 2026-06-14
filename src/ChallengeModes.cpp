@@ -4,6 +4,12 @@
 
 #include "ChallengeModes.h"
 
+namespace
+{
+    constexpr uint32 HARDCORE_TOKEN_ITEM_ID = 90002;
+    constexpr uint32 DOUBLE_EXPERIENCE_AURA = 90000;
+}
+
 ChallengeModes* ChallengeModes::instance()
 {
     static ChallengeModes instance;
@@ -21,14 +27,12 @@ bool ChallengeModes::challengeEnabledForPlayer(ChallengeModeSettings setting, Pl
 
 bool ChallengeModes::challengeEnabledCheckbyToken(ChallengeModeSettings setting, Player* player) const
 {
-    const int Hardcore_token_item = 90002;
-
     if (!enabled() || !challengeEnabled(setting))
     {
         return false;
     }
     // 通过角色是否拥有Token物品进行相关判断
-    return player->HasItemCount(Hardcore_token_item, 1, true);
+    return player->HasItemCount(HARDCORE_TOKEN_ITEM_ID, 1, true);
 }
 
 bool ChallengeModes::challengeEnabled(ChallengeModeSettings setting) const
@@ -437,10 +441,6 @@ public:
         }
         player->UpdatePlayerSetting("mod-challenge-modes", HARDCORE_DEAD, 1);
         player->GetSession()->KickPlayer(std::string("极限模式角色已死亡"));
-
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->GetLevel(), "ghost", player->GetTotalPlayedTime());
     }
 
     void OnPlayerPVPKill(Player* /*killer*/, Player* killed) override
@@ -450,19 +450,6 @@ public:
             return;
         }
         killed->UpdatePlayerSetting("mod-challenge-modes", HARDCORE_DEAD, 1);
-
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            killed->GetGUID().GetCounter(), killed->GetLevel(), "pvp", killed->GetTotalPlayedTime());
-
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::string playername = killed->GetName();
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
-            " 在PVP中阵亡，挑战失败！";
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
     void OnPlayerKilledByCreature(Creature* /*killer*/, Player* killed) override
@@ -472,21 +459,6 @@ public:
             return;
         }
         killed->UpdatePlayerSetting("mod-challenge-modes", HARDCORE_DEAD, 1);
-
-        // 插入数据库记录
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            killed->GetGUID().GetCounter(), killed->GetLevel(), "death", killed->GetTotalPlayedTime());
-
-        // 广播
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::string playername = killed->GetName();
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
-            " 挑战失败，但失败并不意味着结束，它只是一个新的起点，祝越来越好！";
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
     void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool& /*applySickness*/) override
@@ -499,19 +471,6 @@ public:
         player->UpdatePlayerSetting("mod-challenge-modes", HARDCORE_DEAD, 1);
         player->KillPlayer();
         player->GetSession()->KickPlayer(std::string("极限模式角色已死亡"));
-
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->GetLevel(), "resurrect", player->GetTotalPlayedTime());
-
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::string playername = player->GetName();
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
-            " 尝试复活，挑战失败！";
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
@@ -522,24 +481,6 @@ public:
     void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
         ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
-
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player))
-        {
-            return;
-        }
-
-        uint8 level = player->GetLevel();
-        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_completed (character_guid, character_level, achievement, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), level, "", player->GetTotalPlayedTime());
-
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << player->GetName() << "|r|cff" << tag_colour <<
-            " 升级到" << static_cast<int>(level) << "级，继续加油！|r";
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 };
 
@@ -709,10 +650,87 @@ public:
         }
         // A better implementation is to not allow the resurrect but this will need a new hook added first
         player->KillPlayer();
+
+        // DIY: 记录并广播尝试复活
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), player->GetLevel(), "resurrect", player->GetTotalPlayedTime());
+
+        std::string plr_colour = "00CC00";
+        std::string tag_colour = "FF8000";
+        std::string playername = player->GetName();
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
+            " 尝试复活，挑战失败！";
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+    }
+
+    // DIY: 记录并广播释放灵魂
+    void OnPlayerReleasedGhost(Player* player) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+        {
+            return;
+        }
+
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), player->GetLevel(), "ghost", player->GetTotalPlayedTime());
+    }
+
+    // DIY: 记录并广播被玩家击杀
+    void OnPlayerPVPKill(Player* /*killer*/, Player* killed) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, killed))
+        {
+            return;
+        }
+
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            killed->GetGUID().GetCounter(), killed->GetLevel(), "pvp", killed->GetTotalPlayedTime());
+
+        std::string plr_colour = "00CC00";
+        std::string tag_colour = "FF8000";
+        std::string playername = killed->GetName();
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
+            " 在PVP中阵亡，挑战失败！";
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+    }
+
+    // DIY: 记录并广播被怪物击杀
+    void OnPlayerKilledByCreature(Creature* /*killer*/, Player* killed) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, killed))
+        {
+            return;
+        }
+
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_failed (character_guid, character_level, death_reason, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            killed->GetGUID().GetCounter(), killed->GetLevel(), "death", killed->GetTotalPlayedTime());
+
+        std::string plr_colour = "00CC00";
+        std::string tag_colour = "FF8000";
+        std::string playername = killed->GetName();
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << playername << " |r|cff" << tag_colour <<
+            " 挑战失败，但失败并不意味着结束，它只是一个新的起点，祝越来越好！";
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
+        // DIY: 移除双倍经验合剂效果
+        if (sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+        {
+            player->RemoveAura(DOUBLE_EXPERIENCE_AURA);
+        }
+
         ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
@@ -724,6 +742,20 @@ public:
         }
         player->SetFreeTalentPoints(0); // Remove all talent points
         ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
+
+        // DIY: 记录并广播升级
+        uint8 level = player->GetLevel();
+        CharacterDatabase.Execute("INSERT INTO hardcore_challenge_completed (character_guid, character_level, achievement, total_spent_time) "
+            "VALUES ({}, {}, '{}',{})",
+            player->GetGUID().GetCounter(), level, "", player->GetTotalPlayedTime());
+
+        std::string plr_colour = "00CC00";
+        std::string tag_colour = "FF8000";
+        std::ostringstream stream;
+        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+            " 角色 |r|cff" << plr_colour << player->GetName() << "|r|cff" << tag_colour <<
+            " 升级到" << static_cast<int>(level) << "级，继续加油！|r";
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
     }
 
     void OnPlayerTalentsReset(Player* player, bool /*noCost*/) override
@@ -744,13 +776,28 @@ public:
         return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
     }
 
-    bool OnPlayerCanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+    bool OnPlayerCanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
             return true;
         }
-        // Are there any exceptions in WotLK? If so need to be added here
+
+        // DIY: 仅允许萨满武器附魔（冰封/火舌/石化/风怒）
+        int shamanWeaponEnchantIds[] = { 1666, 2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784,
+                                          5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781,
+                                          1, 6, 29, 3032,
+                                          283, 284, 525, 1669, 2636, 3785, 3786, 3787 };
+
+        uint32 enchantId = uint32(item->GetEnchantmentId(slot));
+        for (int shamanEnchantId : shamanWeaponEnchantIds)
+        {
+            if (enchantId == shamanEnchantId)
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
@@ -841,6 +888,28 @@ public:
         return false;
     }
 
+    // DIY: 禁止邮寄
+    bool OnPlayerCanSendMail(Player* player, ObjectGuid /*receiverGuid*/, ObjectGuid /*mailbox*/,
+        std::string& /*subject*/, std::string& /*body*/, uint32 /*money*/, uint32 /*COD*/, Item* /*item*/) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    // DIY: 禁止使用地下城查找器
+    bool OnPlayerCanJoinLfg(Player* player, uint8 /*roles*/, std::set<uint32>& /*dungeons*/,
+        const std::string& /*comment*/) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+        {
+            return true;
+        }
+        return false;
+    }
+
 };
 
 class gobject_challenge_modes : public GameObjectScript
@@ -900,7 +969,10 @@ public:
         }
         if (sChallengeModes->challengeEnabled(SETTING_IRON_MAN) && !playerSettingEnabled(player, SETTING_IRON_MAN) && !playerSettingEnabled(player, SETTING_SELF_CRAFTED))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "启用铁人模式", 0, SETTING_IRON_MAN);
+            // DIY: 使用铁人模式实现“硬核挑战模式”
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_IRON_MAN,
+                "选择开启硬核挑战模式，系统将销毁当前已装备的各种装备。\n"
+                "你确定要继续吗？\n\n", 0, false);
         }
         SendGossipMenuFor(player, 12669, go->GetGUID());
         return true;
@@ -908,8 +980,49 @@ public:
 
     bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 /*sender*/, uint32 action) override
     {
+        if (player->GetGroup() != nullptr)
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage("你当前在队伍中，无法开启挑战模式。");
+            CloseGossipMenuFor(player);
+            return false;
+        }
+
         player->UpdatePlayerSetting("mod-challenge-modes", action, 1);
-        ChatHandler(player->GetSession()).PSendSysMessage("挑战模式已启用。");
+
+        if (action == SETTING_IRON_MAN)
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式开启。");
+
+            if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_IRON_MAN, player))
+            {
+                player->AddItem(HARDCORE_TOKEN_ITEM_ID, 1);
+
+                for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
+                {
+                    if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                    {
+                        if (pItem->GetTemplate() && !pItem->IsEquipped())
+                            continue;
+                        uint8 slot = pItem->GetSlot();
+                        player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+                    }
+                }
+            }
+
+            std::string plr = player->GetName();
+            std::string tag_colour = "7bbef7";
+            std::string plr_colour = "ffff00";
+            std::ostringstream stream;
+            stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
+                " 角色 |r|cff" << plr_colour << plr << "|r|cff" << tag_colour <<
+                " 开启硬核挑战模式，祝好运！|r";
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
+        }
+        else
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage("挑战模式已启用。");
+        }
+
         CloseGossipMenuFor(player);
         return true;
     }

@@ -17,7 +17,6 @@
 #include <map>
 #include <sstream>
 
-
 enum ChallengeModeSettings
 {
     SETTING_HARDCORE           = 0,
@@ -38,14 +37,12 @@ enum AllowedProfessions
     BEAST_TRAINING = 5149
 };
 
-
-
 class ChallengeModes
 {
 public:
     static ChallengeModes* instance();
 
-    bool challengesEnabled, hardcoreEnable, semiHardcoreEnable, selfCraftedEnable, itemQualityLevelEnable, slowXpGainEnable, verySlowXpGainEnable, questXpOnlyEnable, ironManEnable;
+    bool challengesEnabled, hardcoreEnable, semiHardcoreEnable, selfCraftedEnable, itemQualityLevelEnable, slowXpGainEnable, verySlowXpGainEnable, questXpOnlyEnable, ironManEnable, ironManEnhancedEnable;
     uint32 hardcoreDisableLevel, semiHardcoreDisableLevel, selfCraftedDisableLevel, itemQualityLevelDisableLevel, slowXpGainDisableLevel, verySlowXpGainDisableLevel, questXpOnlyDisableLevel, ironManDisableLevel, hardcoreItemRewardAmount, semiHardcoreItemRewardAmount, selfCraftedItemRewardAmount, itemQualityLevelItemRewardAmount, slowXpGainItemRewardAmount, verySlowXpGainItemRewardAmount, questXpOnlyItemRewardAmount, ironManItemRewardAmount;
     float hardcoreXpBonus, semiHardcoreXpBonus, selfCraftedXpBonus, itemQualityLevelXpBonus, questXpOnlyXpBonus, slowXpGainBonus, verySlowXpGainBonus, ironManXpBonus;
     std::unordered_map<uint8, uint32> hardcoreTitleRewards, semiHardcoreTitleRewards, selfCraftedTitleRewards, itemQualityLevelTitleRewards, slowXpGainTitleRewards, verySlowXpGainTitleRewards, questXpOnlyTitleRewards, ironManTitleRewards;
@@ -75,7 +72,7 @@ public:
 
                     { "Hardcore.ItemRewards",                 &hardcoreItemRewards                  },
                     { "SemiHardcore.ItemRewards",             &semiHardcoreItemRewards              },
-                    { "SelfCrafted.ItemRewards",              &selfCraftedItemRewards               }, 
+                    { "SelfCrafted.ItemRewards",              &selfCraftedItemRewards               },
                     { "ItemQualityLevel.ItemRewards",         &itemQualityLevelItemRewards          },
                     { "SlowXpGain.ItemRewards",               &slowXpGainItemRewards                },
                     { "VerySlowXpGain.ItemRewards",           &verySlowXpGainItemRewards            },
@@ -98,11 +95,11 @@ public:
     [[nodiscard]] float getXpBonusForChallenge(ChallengeModeSettings setting) const;
     bool challengeEnabledForPlayer(ChallengeModeSettings setting, Player* player) const;
     bool challengeEnabledCheckbyToken(ChallengeModeSettings setting, Player* player) const;
-    
-    [[nodiscard]] const std::unordered_map<uint8, uint32> *getTitleMapForChallenge(ChallengeModeSettings setting) const;
-    [[nodiscard]] const std::unordered_map<uint8, uint32> *getTalentMapForChallenge(ChallengeModeSettings setting) const;
-    [[nodiscard]] const std::unordered_map<uint8, uint32> *getItemMapForChallenge(ChallengeModeSettings setting) const;
-    [[nodiscard]] const std::unordered_map<uint8, uint32> *getAchievementMapForChallenge(ChallengeModeSettings setting) const;
+
+    [[nodiscard]] std::unordered_map<uint8, uint32> const* getTitleMapForChallenge(ChallengeModeSettings setting) const;
+    [[nodiscard]] std::unordered_map<uint8, uint32> const* getTalentMapForChallenge(ChallengeModeSettings setting) const;
+    [[nodiscard]] std::unordered_map<uint8, uint32> const* getItemMapForChallenge(ChallengeModeSettings setting) const;
+    [[nodiscard]] std::unordered_map<uint8, uint32> const* getAchievementMapForChallenge(ChallengeModeSettings setting) const;
     [[nodiscard]] uint32 getItemRewardAmount(ChallengeModeSettings setting) const;
 };
 

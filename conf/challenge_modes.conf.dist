@@ -123,6 +123,7 @@ QuestXpOnly.DisableLevel = 0
 QuestXpOnly.AchievementReward = ""
 
 IronMan.Enable = 1
+IronMan.Enhanced.Enable = 1
 IronMan.TitleRewards = ""
 IronMan.TalentRewards = ""
 IronMan.ItemRewards = ""

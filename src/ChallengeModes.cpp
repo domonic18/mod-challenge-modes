@@ -810,7 +810,6 @@ public:
             return;
         }
         RecordFailure(player, "resurrect");
-        Broadcast(player, " 尝试复活，挑战失败！");
     }
 
     void OnPlayerReleasedGhost(Player* player) override
@@ -869,13 +868,13 @@ public:
         }
 
         // 仅允许萨满武器附魔（冰封/火舌/石化/风怒）
-        int shamanWeaponEnchantIds[] = { 1666, 2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784,
+        uint32 shamanWeaponEnchantIds[] = { 1666, 2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784,
                                           5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781,
                                           1, 6, 29, 3032,
                                           283, 284, 525, 1669, 2636, 3785, 3786, 3787 };
 
         uint32 enchantId = uint32(item->GetEnchantmentId(slot));
-        for (int shamanEnchantId : shamanWeaponEnchantIds)
+        for (uint32 shamanEnchantId : shamanWeaponEnchantIds)
         {
             if (enchantId == shamanEnchantId)
             {
@@ -898,6 +897,16 @@ public:
 
     bool OnPlayerCanJoinLfg(Player* player, uint8 /*roles*/, std::set<uint32>& /*dungeons*/,
         const std::string& /*comment*/) override
+    {
+        if (!IsEnhancedActive(player))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    bool OnPlayerCanJoinInBattlegroundQueue(Player* player, ObjectGuid /*BattlemasterGuid*/,
+        BattlegroundTypeId /*BGTypeID*/, uint8 /*joinAsGroup*/, GroupJoinBattlegroundResult& /*err*/) override
     {
         if (!IsEnhancedActive(player))
         {

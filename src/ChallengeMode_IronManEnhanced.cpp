@@ -6,13 +6,16 @@
 #include "StringFormat.h"
 #include "Creature.h"
 #include "Chat.h"
+#include "DBCStores.h"
 #include "Log.h"
 #include "ObjectMgr.h"
+#include "SharedDefines.h"
 #include "World.h"
 #include "WorldSessionMgr.h"
 #include <cstring>
 #include <set>
 #include <sstream>
+#include <string>
 
 static std::string GetLocalizedCreatureName(Creature const* creature)
 {
@@ -26,6 +29,21 @@ static std::string GetLocalizedCreatureName(Creature const* creature)
         }
     }
     return name;
+}
+
+static std::string GetDisplayDeathReason(char const* reason)
+{
+    if (strcmp(reason, "environmental") == 0)
+    {
+        return "非正常死亡";
+    }
+
+    if (strcmp(reason, "resurrect") == 0)
+    {
+        return "被复活";
+    }
+
+    return reason;
 }
 
 ChallengeMode_IronMan_Enhanced::ChallengeMode_IronMan_Enhanced()
@@ -130,12 +148,51 @@ void ChallengeMode_IronMan_Enhanced::OnPlayerLevelChanged(Player* player,
         LOG_INFO("entities.player", "IronManEnhanced: recording milestone success for {} (level {})",
             player->GetName(), uint32(level));
 
+        RewardMilestone(player, level);
+
         CharacterDatabase.Execute(
             "INSERT INTO hardcore_challenge_success "
             "(character_guid, character_name, completed_level, total_spent_time) "
             "VALUES ({}, '{}', {}, {})",
             player->GetGUID().GetCounter(), player->GetName(), level,
             player->GetTotalPlayedTime());
+
+        std::string titleName;
+        if (std::unordered_map<uint8, uint32> const* titleMap = sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN_ENHANCED))
+        {
+            auto it = titleMap->find(level);
+            if (it != titleMap->end())
+            {
+                if (CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(it->second))
+                {
+                    char const* rawName = player->getGender() == GENDER_MALE
+                        ? titleInfo->nameMale[sWorld->GetDefaultDbcLocale()]
+                        : titleInfo->nameFemale[sWorld->GetDefaultDbcLocale()];
+                    std::string rawNameStr = rawName ? rawName : "";
+                    size_t pos = 0;
+                    while ((pos = rawNameStr.find("%s", pos)) != std::string::npos)
+                    {
+                        rawNameStr.replace(pos, 2, "{}");
+                        pos += 2;
+                    }
+                    titleName = Acore::StringFormat(rawNameStr, player->GetName());
+                }
+            }
+        }
+
+        std::string plr = player->GetName();
+        std::string tagColour = "7bbef7";
+        std::string plrColour = "ffff00";
+        std::ostringstream stream;
+        stream << "|CFF" << plrColour << "[硬核模式挑战]|r|CFF" << tagColour <<
+            " 角色 |r|cff" << plrColour << plr << "|r|cff" << tagColour <<
+            " 达到 " << uint32(level) << " 级里程碑";
+        if (!titleName.empty())
+        {
+            stream << "，获得头衔 " << titleName;
+        }
+        stream << "！|r";
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 
         if (IsFinalMilestone(level))
         {
@@ -275,6 +332,69 @@ bool ChallengeMode_IronMan_Enhanced::OnPlayerCanJoinInArenaQueue(Player* player,
     return false;
 }
 
+bool ChallengeMode_IronMan_Enhanced::OnPlayerCanInitTrade(Player* player,
+    Player* target)
+{
+    bool playerHardcore = IsEnhancedActive(player);
+    bool targetHardcore = target && IsEnhancedActive(target);
+
+    if (!playerHardcore && !targetHardcore)
+    {
+        return true;
+    }
+
+    ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法进行交易。");
+    return false;
+}
+
+bool ChallengeMode_IronMan_Enhanced::OnPlayerCanGroupInvite(Player* player,
+    std::string& /*membername*/)
+{
+    if (!IsEnhancedActive(player))
+    {
+        return true;
+    }
+
+    ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法邀请组队。");
+    return false;
+}
+
+bool ChallengeMode_IronMan_Enhanced::OnPlayerCanGroupAccept(Player* player,
+    Group* /*group*/)
+{
+    if (!IsEnhancedActive(player))
+    {
+        return true;
+    }
+
+    ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法接受组队邀请。");
+    return false;
+}
+
+bool ChallengeMode_IronMan_Enhanced::OnPlayerCanEquipItem(Player* player,
+    uint8 /*slot*/, uint16& /*dest*/, Item* item, bool /*swap*/, bool /*not_loading*/)
+{
+    if (!IsEnhancedActive(player))
+    {
+        return true;
+    }
+
+    if (!item)
+    {
+        return true;
+    }
+
+    uint32 quality = item->GetTemplate()->Quality;
+    if (quality > ITEM_QUALITY_NORMAL)
+    {
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "硬核挑战模式下无法装备品质高于普通的物品。");
+        return false;
+    }
+
+    return true;
+}
+
 void ChallengeMode_IronMan_Enhanced::InitializeProgress(Player* player)
 {
     LOG_INFO("entities.player", "IronManEnhanced: initializing progress for {} (level {})",
@@ -340,8 +460,6 @@ void ChallengeMode_IronMan_Enhanced::HandleChallengeExit(Player* player)
         player->GetTotalPlayedTime());
 
     DeleteProgress(player);
-
-    player->UpdatePlayerSetting("mod-challenge-modes", SETTING_IRON_MAN, 0);
 }
 
 bool ChallengeMode_IronMan_Enhanced::IsEnhancedActive(Player* player)
@@ -358,14 +476,14 @@ bool ChallengeMode_IronMan_Enhanced::IsEnhancedActive(Player* player)
 bool ChallengeMode_IronMan_Enhanced::IsMilestoneLevel(uint8 level)
 {
     std::unordered_map<uint8, uint32> const* titleMap =
-        sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN);
+        sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN_ENHANCED);
     return titleMap && titleMap->find(level) != titleMap->end();
 }
 
 bool ChallengeMode_IronMan_Enhanced::IsFinalMilestone(uint8 level)
 {
     std::unordered_map<uint8, uint32> const* titleMap =
-        sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN);
+        sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN_ENHANCED);
     if (!titleMap || titleMap->empty())
     {
         return false;
@@ -384,13 +502,71 @@ bool ChallengeMode_IronMan_Enhanced::IsFinalMilestone(uint8 level)
     return level == maxLevel;
 }
 
+void ChallengeMode_IronMan_Enhanced::RewardMilestone(Player* player, uint8 level)
+{
+    if (std::unordered_map<uint8, uint32> const* titleMap = sChallengeModes->getTitleMapForChallenge(SETTING_IRON_MAN_ENHANCED))
+    {
+        auto it = titleMap->find(level);
+        if (it != titleMap->end())
+        {
+            CharTitlesEntry const* titleInfo = sCharTitlesStore.LookupEntry(it->second);
+            if (titleInfo)
+            {
+                player->SetTitle(titleInfo);
+            }
+            else
+            {
+                LOG_ERROR("entities.player", "IronManEnhanced: invalid title ID {} for level {}",
+                    it->second, uint32(level));
+            }
+        }
+    }
+
+    if (std::unordered_map<uint8, uint32> const* talentMap = sChallengeModes->getTalentMapForChallenge(SETTING_IRON_MAN_ENHANCED))
+    {
+        auto it = talentMap->find(level);
+        if (it != talentMap->end())
+        {
+            player->RewardExtraBonusTalentPoints(it->second);
+        }
+    }
+
+    if (std::unordered_map<uint8, uint32> const* itemMap = sChallengeModes->getItemMapForChallenge(SETTING_IRON_MAN_ENHANCED))
+    {
+        auto it = itemMap->find(level);
+        if (it != itemMap->end())
+        {
+            uint32 itemAmount = sChallengeModes->getItemRewardAmount(SETTING_IRON_MAN_ENHANCED);
+            player->SendItemRetrievalMail({ { it->second, itemAmount } });
+        }
+    }
+
+    if (std::unordered_map<uint8, uint32> const* achievementMap = sChallengeModes->getAchievementMapForChallenge(SETTING_IRON_MAN_ENHANCED))
+    {
+        auto it = achievementMap->find(level);
+        if (it != achievementMap->end())
+        {
+            AchievementEntry const* achievementInfo = sAchievementStore.LookupEntry(it->second);
+            if (achievementInfo)
+            {
+                player->CompletedAchievement(achievementInfo);
+            }
+            else
+            {
+                LOG_ERROR("entities.player", "IronManEnhanced: invalid achievement ID {} for level {}",
+                    it->second, uint32(level));
+            }
+        }
+    }
+}
+
 void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* reason, Unit* killer)
 {
     LOG_INFO("entities.player", "IronManEnhanced: RecordFailure for {} (level {}, reason={})",
         player->GetName(), uint32(player->GetLevel()), reason);
 
     std::string killerInfo;
-    std::string displayReason = reason;
+    std::string displayReason = GetDisplayDeathReason(reason);
 
     if (strcmp(reason, "resurrect") != 0)
     {
@@ -442,6 +618,11 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
         killerInfo, player->GetTotalPlayedTime());
 
     BanCharacter(player);
+
+    if (strcmp(reason, "resurrect") == 0)
+    {
+        return;
+    }
 
     std::string plr = player->GetName();
     std::string tagColour = "ff0000";

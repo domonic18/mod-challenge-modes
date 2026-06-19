@@ -444,6 +444,12 @@ void ChallengeMode_IronMan_Enhanced::HandleChallengeExit(Player* player)
     LOG_DEBUG("entities.player", "IronManEnhanced::HandleChallengeExit called for {} (level {}, active={})",
         player->GetName(), uint32(player->GetLevel()), IsEnhancedActive(player));
 
+    // 无论是否仍持有凭证，退出时都要解除本模式施加的角色封禁，
+    // 否则死亡后丢弃/销毁凭证的玩家将无法再次登录。
+    CharacterDatabase.Execute(
+        "UPDATE character_banned SET active = 0 WHERE guid = {} AND active = 1 AND bannedby = 'IronManEnhanced'",
+        player->GetGUID().GetCounter());
+
     if (!IsEnhancedActive(player))
     {
         return;

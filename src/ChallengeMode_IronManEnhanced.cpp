@@ -7,10 +7,26 @@
 #include "Creature.h"
 #include "Chat.h"
 #include "Log.h"
+#include "ObjectMgr.h"
+#include "World.h"
 #include "WorldSessionMgr.h"
 #include <cstring>
 #include <set>
 #include <sstream>
+
+static std::string GetLocalizedCreatureName(Creature const* creature)
+{
+    std::string name = creature->GetName();
+    if (CreatureLocale const* cl = sObjectMgr->GetCreatureLocale(creature->GetEntry()))
+    {
+        LocaleConstant locale = sWorld->GetDefaultDbcLocale();
+        if (cl->Name.size() > static_cast<size_t>(locale) && !cl->Name[locale].empty())
+        {
+            name = cl->Name[locale];
+        }
+    }
+    return name;
+}
 
 ChallengeMode_IronMan_Enhanced::ChallengeMode_IronMan_Enhanced()
     : PlayerScript("ChallengeMode_IronMan_Enhanced")
@@ -98,6 +114,9 @@ void ChallengeMode_IronMan_Enhanced::OnPlayerReleasedGhost(Player* player)
 void ChallengeMode_IronMan_Enhanced::OnPlayerLevelChanged(Player* player,
     uint8 /*oldlevel*/)
 {
+    // 等级变化后重新评估挑战雕像等 GameObject 的可见性
+    player->UpdateVisibilityForPlayer();
+
     if (!IsEnhancedActive(player))
     {
         return;
@@ -371,6 +390,7 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
         player->GetName(), uint32(player->GetLevel()), reason);
 
     std::string killerInfo;
+    std::string displayReason = reason;
 
     if (strcmp(reason, "resurrect") != 0)
     {
@@ -390,6 +410,8 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
                 {
                     killerInfo = Acore::StringFormat("player:{}:level{}:class{}",
                         pk->GetName(), pk->GetLevel(), uint32(pk->getClass()));
+                    displayReason = Acore::StringFormat("被玩家 {} (等级 {}) 击杀",
+                        pk->GetName(), uint32(pk->GetLevel()));
                 }
             }
             else if (killer->IsCreature())
@@ -397,8 +419,11 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
                 reason = "creature";
                 if (Creature* ck = killer->ToCreature())
                 {
+                    std::string creatureName = GetLocalizedCreatureName(ck);
                     killerInfo = Acore::StringFormat("creature:{}:{}:level{}",
-                        ck->GetEntry(), ck->GetName(), ck->GetLevel());
+                        ck->GetEntry(), creatureName, ck->GetLevel());
+                    displayReason = Acore::StringFormat("被怪物 {} (等级 {}) 击杀",
+                        creatureName, uint32(ck->GetLevel()));
                 }
             }
         }
@@ -424,7 +449,7 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
     std::ostringstream stream;
     stream << "|CFF" << plrColour << "[硬核模式挑战]|r|CFF" << tagColour <<
         " 角色 |r|cff" << plrColour << plr << "|r|cff" << tagColour <<
-        " 挑战失败！原因：" << reason << "|r";
+        " 挑战失败！原因：" << displayReason << "|r";
     sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
 }
 

@@ -17,6 +17,9 @@
 #include <map>
 #include <sstream>
 
+inline constexpr uint32 HARDCORE_TOKEN_ITEM_ID = 90002;
+inline constexpr uint32 DOUBLE_EXPERIENCE_AURA = 90000;
+
 enum ChallengeModeSettings
 {
     SETTING_HARDCORE           = 0,
@@ -27,7 +30,8 @@ enum ChallengeModeSettings
     SETTING_VERY_SLOW_XP_GAIN  = 5,
     SETTING_QUEST_XP_ONLY      = 6,
     SETTING_IRON_MAN           = 7,
-    HARDCORE_DEAD              = 8
+    HARDCORE_DEAD              = 8,
+    IRON_MAN_DEAD              = 9
 };
 
 enum AllowedProfessions

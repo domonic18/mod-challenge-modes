@@ -3,12 +3,7 @@
  */
 
 #include "ChallengeModes.h"
-
-namespace
-{
-    constexpr uint32 HARDCORE_TOKEN_ITEM_ID = 90002;
-    constexpr uint32 DOUBLE_EXPERIENCE_AURA = 90000;
-}
+#include "ChallengeMode_IronManEnhanced.h"
 
 ChallengeModes* ChallengeModes::instance()
 {
@@ -56,6 +51,7 @@ bool ChallengeModes::challengeEnabled(ChallengeModeSettings setting) const
         case SETTING_IRON_MAN:
             return ironManEnable;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return false;
@@ -82,6 +78,7 @@ uint32 ChallengeModes::getDisableLevel(ChallengeModeSettings setting) const
         case SETTING_IRON_MAN:
             return ironManDisableLevel;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return 0;
@@ -108,6 +105,7 @@ float ChallengeModes::getXpBonusForChallenge(ChallengeModeSettings setting) cons
         case SETTING_IRON_MAN:
             return ironManXpBonus;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return 1;
@@ -134,6 +132,7 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getTitleMapForChallenge
         case SETTING_IRON_MAN:
             return &ironManTitleRewards;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return {};
@@ -160,6 +159,7 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getTalentMapForChalleng
         case SETTING_IRON_MAN:
             return &ironManTalentRewards;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return {};
@@ -186,6 +186,7 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getItemMapForChallenge(
         case SETTING_IRON_MAN:
             return &ironManItemRewards;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return {};
@@ -212,6 +213,7 @@ uint32 ChallengeModes::getItemRewardAmount(ChallengeModeSettings setting) const
         case SETTING_IRON_MAN:
             return ironManItemRewardAmount;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return 0;
@@ -238,6 +240,7 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getAchievementMapForCha
         case SETTING_IRON_MAN:
             return &ironManAchievementReward;
         case HARDCORE_DEAD:
+        case IRON_MAN_DEAD:
             break;
     }
     return {};
@@ -787,174 +790,6 @@ public:
 
 };
 
-// 铁人增强模式：自定义“硬核挑战模式”的额外行为（记录、广播、额外限制），
-// 独立成一个 PlayerScript，避免与上游 ChallengeMode_IronMan 合并时产生冲突。
-class ChallengeMode_IronMan_Enhanced : public PlayerScript
-{
-public:
-    ChallengeMode_IronMan_Enhanced() : PlayerScript("ChallengeMode_IronMan_Enhanced") {}
-
-    void OnPlayerGiveXP(Player* player, uint32& /*amount*/, Unit* /*victim*/, uint8 /*xpSource*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return;
-        }
-        player->RemoveAura(DOUBLE_EXPERIENCE_AURA);
-    }
-
-    void OnPlayerResurrect(Player* player, float /*restore_percent*/, bool& /*applySickness*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return;
-        }
-        RecordFailure(player, "resurrect");
-    }
-
-    void OnPlayerReleasedGhost(Player* player) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return;
-        }
-        RecordFailure(player, "ghost");
-    }
-
-    void OnPlayerPVPKill(Player* /*killer*/, Player* killed) override
-    {
-        if (!IsEnhancedActive(killed))
-        {
-            return;
-        }
-        RecordFailure(killed, "pvp");
-        Broadcast(killed, " 在PVP中阵亡，挑战失败！");
-    }
-
-    void OnPlayerKilledByCreature(Creature* /*killer*/, Player* killed) override
-    {
-        if (!IsEnhancedActive(killed))
-        {
-            return;
-        }
-        RecordFailure(killed, "death");
-        Broadcast(killed,
-            " 挑战失败，但失败并不意味着结束，它只是一个新的起点，祝越来越好！");
-    }
-
-    void OnPlayerLevelChanged(Player* player, uint8 /*oldlevel*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return;
-        }
-
-        uint8 level = player->GetLevel();
-        CharacterDatabase.Execute(
-            "INSERT INTO hardcore_challenge_completed "
-            "(character_guid, character_level, achievement, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), level, "", player->GetTotalPlayedTime());
-
-        BroadcastLevelUp(player, level);
-    }
-
-    bool OnPlayerCanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot,
-        bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return true;
-        }
-
-        // 仅允许萨满武器附魔（冰封/火舌/石化/风怒）
-        uint32 shamanWeaponEnchantIds[] = { 1666, 2, 12, 524, 1667, 1668, 2635, 3782, 3783, 3784,
-                                          5, 4, 3, 523, 1665, 1666, 2634, 3779, 3780, 3781,
-                                          1, 6, 29, 3032,
-                                          283, 284, 525, 1669, 2636, 3785, 3786, 3787 };
-
-        uint32 enchantId = uint32(item->GetEnchantmentId(slot));
-        for (uint32 shamanEnchantId : shamanWeaponEnchantIds)
-        {
-            if (enchantId == shamanEnchantId)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    bool OnPlayerCanSendMail(Player* player, ObjectGuid /*receiverGuid*/, ObjectGuid /*mailbox*/,
-        std::string& /*subject*/, std::string& /*body*/, uint32 /*money*/, uint32 /*COD*/, Item* /*item*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool OnPlayerCanJoinLfg(Player* player, uint8 /*roles*/, std::set<uint32>& /*dungeons*/,
-        const std::string& /*comment*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool OnPlayerCanJoinInBattlegroundQueue(Player* player, ObjectGuid /*BattlemasterGuid*/,
-        BattlegroundTypeId /*BGTypeID*/, uint8 /*joinAsGroup*/, GroupJoinBattlegroundResult& /*err*/) override
-    {
-        if (!IsEnhancedActive(player))
-        {
-            return true;
-        }
-        return false;
-    }
-
-private:
-    static bool IsEnhancedActive(Player* player)
-    {
-        return sChallengeModes->ironManEnhancedEnable &&
-               sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player);
-    }
-
-    static void RecordFailure(Player* player, const char* reason)
-    {
-        CharacterDatabase.Execute(
-            "INSERT INTO hardcore_challenge_failed "
-            "(character_guid, character_level, death_reason, total_spent_time) "
-            "VALUES ({}, {}, '{}',{})",
-            player->GetGUID().GetCounter(), player->GetLevel(), reason,
-            player->GetTotalPlayedTime());
-    }
-
-    static void Broadcast(Player* player, const char* message)
-    {
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << player->GetName() << " |r|cff" <<
-            tag_colour << message;
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
-    }
-
-    static void BroadcastLevelUp(Player* player, uint8 level)
-    {
-        std::string plr_colour = "00CC00";
-        std::string tag_colour = "FF8000";
-        std::ostringstream stream;
-        stream << "|CFF" << plr_colour << "[硬核模式挑战]|r|CFF" << tag_colour <<
-            " 角色 |r|cff" << plr_colour << player->GetName() << "|r|cff" <<
-            tag_colour << " 升级到" << static_cast<int>(level) << "级，继续加油！|r";
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, stream.str().c_str());
-    }
-};
-
 class gobject_challenge_modes : public GameObjectScript
 {
 private:
@@ -1037,6 +872,8 @@ public:
         {
             ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式开启。");
 
+            ChallengeMode_IronMan_Enhanced::InitializeProgress(player);
+
             if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_IRON_MAN, player))
             {
                 player->AddItem(HARDCORE_TOKEN_ITEM_ID, 1);
@@ -1089,6 +926,7 @@ void AddSC_mod_challenge_modes()
     new ChallengeMode_SlowXpGain();
     new ChallengeMode_VerySlowXpGain();
     new ChallengeMode_QuestXpOnly();
-    new ChallengeMode_IronMan();
+    new ChallengeMode_IronMan_Enhanced_UnitScript();
     new ChallengeMode_IronMan_Enhanced();
+    new ChallengeMode_IronMan();
 }

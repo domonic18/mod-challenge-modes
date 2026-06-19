@@ -1,8 +1,13 @@
--- 硬核挑战数据存储（初始化表）
+-- 硬核挑战数据存储重构：从旧表迁移数据并删除旧表
+-- 适用于已存在 hardcore_challenge_completed / hardcore_challenge_failed 的服务器
 
-DROP TABLE IF EXISTS `hardcore_challenge_completed`;
-DROP TABLE IF EXISTS `hardcore_challenge_failed`;
+SET @completed_exists = (SELECT COUNT(*) FROM `information_schema`.`tables`
+    WHERE `table_schema` = DATABASE() AND `table_name` = 'hardcore_challenge_completed');
 
+SET @failed_exists = (SELECT COUNT(*) FROM `information_schema`.`tables`
+    WHERE `table_schema` = DATABASE() AND `table_name` = 'hardcore_challenge_failed');
+
+-- 1. 创建新表（若不存在）
 CREATE TABLE IF NOT EXISTS `hardcore_challenge_success` (
     `id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
     `character_guid` BIGINT(20) UNSIGNED NOT NULL,
@@ -55,3 +60,29 @@ CREATE TABLE IF NOT EXISTS `hardcore_challenge_exit` (
     PRIMARY KEY (`id`),
     KEY `idx_character_guid` (`character_guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. 迁移旧表数据（仅在旧表存在时执行）
+SET @migrate_completed = IF(@completed_exists = 1,
+    'INSERT INTO `hardcore_challenge_success` (`character_guid`, `character_name`, `completed_level`, `total_spent_time`, `completed_at`)
+     SELECT c.`character_guid`, COALESCE(ch.`name`, \'\'), MAX(c.`character_level`), MAX(c.`total_spent_time`), NOW()
+     FROM `hardcore_challenge_completed` c
+     LEFT JOIN `characters` ch ON ch.`guid` = c.`character_guid`
+     GROUP BY c.`character_guid`;',
+    'SELECT 1;');
+PREPARE stmt_completed FROM @migrate_completed;
+EXECUTE stmt_completed;
+DEALLOCATE PREPARE stmt_completed;
+
+SET @migrate_failed = IF(@failed_exists = 1,
+    'INSERT INTO `hardcore_challenge_failure` (`character_guid`, `character_name`, `character_level`, `death_reason`, `death_location_map_id`, `death_location_zone_id`, `death_location_area_id`, `death_location_x`, `death_location_y`, `death_location_z`, `killer_info`, `total_spent_time`, `failed_at`)
+     SELECT f.`character_guid`, COALESCE(ch.`name`, \'\'), f.`character_level`, f.`death_reason`, 0, 0, 0, 0.0, 0.0, 0.0, NULL, f.`total_spent_time`, NOW()
+     FROM `hardcore_challenge_failed` f
+     LEFT JOIN `characters` ch ON ch.`guid` = f.`character_guid`;',
+    'SELECT 1;');
+PREPARE stmt_failed FROM @migrate_failed;
+EXECUTE stmt_failed;
+DEALLOCATE PREPARE stmt_failed;
+
+-- 3. 删除旧表
+DROP TABLE IF EXISTS `hardcore_challenge_completed`;
+DROP TABLE IF EXISTS `hardcore_challenge_failed`;

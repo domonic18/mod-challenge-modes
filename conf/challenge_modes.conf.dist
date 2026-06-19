@@ -123,7 +123,6 @@ QuestXpOnly.DisableLevel = 0
 QuestXpOnly.AchievementReward = ""
 
 IronMan.Enable = 1
-IronMan.Enhanced.Enable = 1
 IronMan.TitleRewards = ""
 IronMan.TalentRewards = ""
 IronMan.ItemRewards = ""
@@ -131,3 +130,12 @@ IronMan.ItemRewardAmount = 1
 IronMan.DisableLevel = 0
 IronMan.XPMultiplier = 1
 IronMan.AchievementReward = ""
+
+IronManEnhanced.Enable = 1
+IronManEnhanced.TitleRewards = ""
+IronManEnhanced.TalentRewards = ""
+IronManEnhanced.ItemRewards = ""
+IronManEnhanced.ItemRewardAmount = 1
+IronManEnhanced.DisableLevel = 0
+IronManEnhanced.XPMultiplier = 1
+IronManEnhanced.AchievementReward = ""

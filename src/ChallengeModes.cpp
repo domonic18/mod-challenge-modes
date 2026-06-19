@@ -50,6 +50,8 @@ bool ChallengeModes::challengeEnabled(ChallengeModeSettings setting) const
             return questXpOnlyEnable;
         case SETTING_IRON_MAN:
             return ironManEnable;
+        case SETTING_IRON_MAN_ENHANCED:
+            return ironManEnhancedEnable;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -77,6 +79,8 @@ uint32 ChallengeModes::getDisableLevel(ChallengeModeSettings setting) const
             return questXpOnlyDisableLevel;
         case SETTING_IRON_MAN:
             return ironManDisableLevel;
+        case SETTING_IRON_MAN_ENHANCED:
+            return ironManEnhancedDisableLevel;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -104,6 +108,8 @@ float ChallengeModes::getXpBonusForChallenge(ChallengeModeSettings setting) cons
             return questXpOnlyXpBonus;
         case SETTING_IRON_MAN:
             return ironManXpBonus;
+        case SETTING_IRON_MAN_ENHANCED:
+            return ironManEnhancedXpBonus;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -131,6 +137,8 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getTitleMapForChallenge
             return &questXpOnlyTitleRewards;
         case SETTING_IRON_MAN:
             return &ironManTitleRewards;
+        case SETTING_IRON_MAN_ENHANCED:
+            return &ironManEnhancedTitleRewards;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -158,6 +166,8 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getTalentMapForChalleng
             return &questXpOnlyTalentRewards;
         case SETTING_IRON_MAN:
             return &ironManTalentRewards;
+        case SETTING_IRON_MAN_ENHANCED:
+            return &ironManEnhancedTalentRewards;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -185,6 +195,8 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getItemMapForChallenge(
             return &questXpOnlyItemRewards;
         case SETTING_IRON_MAN:
             return &ironManItemRewards;
+        case SETTING_IRON_MAN_ENHANCED:
+            return &ironManEnhancedItemRewards;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -212,6 +224,8 @@ uint32 ChallengeModes::getItemRewardAmount(ChallengeModeSettings setting) const
             return questXpOnlyItemRewardAmount;
         case SETTING_IRON_MAN:
             return ironManItemRewardAmount;
+        case SETTING_IRON_MAN_ENHANCED:
+            return ironManEnhancedItemRewardAmount;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -239,6 +253,8 @@ std::unordered_map<uint8, uint32> const* ChallengeModes::getAchievementMapForCha
             return &questXpOnlyAchievementReward;
         case SETTING_IRON_MAN:
             return &ironManAchievementReward;
+        case SETTING_IRON_MAN_ENHANCED:
+            return &ironManEnhancedAchievementReward;
         case HARDCORE_DEAD:
         case IRON_MAN_DEAD:
             break;
@@ -296,7 +312,7 @@ private:
             sChallengeModes->verySlowXpGainEnable    = sConfigMgr->GetOption<bool>("VerySlowXpGain.Enable", true);
             sChallengeModes->questXpOnlyEnable       = sConfigMgr->GetOption<bool>("QuestXpOnly.Enable", true);
             sChallengeModes->ironManEnable           = sConfigMgr->GetOption<bool>("IronMan.Enable", true);
-            sChallengeModes->ironManEnhancedEnable   = sConfigMgr->GetOption<bool>("IronMan.Enhanced.Enable", false);
+            sChallengeModes->ironManEnhancedEnable   = sConfigMgr->GetOption<bool>("IronManEnhanced.Enable", false);
 
             sChallengeModes->hardcoreDisableLevel          = sConfigMgr->GetOption<uint32>("Hardcore.DisableLevel", 0);
             sChallengeModes->semiHardcoreDisableLevel      = sConfigMgr->GetOption<uint32>("SemiHardcore.DisableLevel", 0);
@@ -306,6 +322,7 @@ private:
             sChallengeModes->verySlowXpGainDisableLevel    = sConfigMgr->GetOption<uint32>("VerySlowXpGain.DisableLevel", 0);
             sChallengeModes->questXpOnlyDisableLevel       = sConfigMgr->GetOption<uint32>("QuestXpOnly.DisableLevel", 0);
             sChallengeModes->ironManDisableLevel           = sConfigMgr->GetOption<uint32>("IronMan.DisableLevel", 0);
+            sChallengeModes->ironManEnhancedDisableLevel    = sConfigMgr->GetOption<uint32>("IronManEnhanced.DisableLevel", 0);
 
             sChallengeModes->hardcoreXpBonus         = sConfigMgr->GetOption<float>("Hardcore.XPMultiplier", 1.0f);
             sChallengeModes->semiHardcoreXpBonus     = sConfigMgr->GetOption<float>("SemiHardcore.XPMultiplier", 1.0f);
@@ -315,6 +332,7 @@ private:
             sChallengeModes->slowXpGainBonus         = sConfigMgr->GetOption<float>("SlowXpGain.XPMultiplier", 0.50f);
             sChallengeModes->verySlowXpGainBonus     = sConfigMgr->GetOption<float>("VerySlowXpGain.XPMultiplier", 0.25f);
             sChallengeModes->ironManXpBonus          = sConfigMgr->GetOption<float>("IronMan.XPMultiplier", 1.0f);
+            sChallengeModes->ironManEnhancedXpBonus  = sConfigMgr->GetOption<float>("IronManEnhanced.XPMultiplier", 1.0f);
 
             sChallengeModes->hardcoreItemRewardAmount         = sConfigMgr->GetOption<uint32>("Hardcore.ItemRewardAmount", 1);
             sChallengeModes->semiHardcoreItemRewardAmount     = sConfigMgr->GetOption<uint32>("SemiHardcore.ItemRewardAmount", 1);
@@ -324,6 +342,7 @@ private:
             sChallengeModes->verySlowXpGainItemRewardAmount   = sConfigMgr->GetOption<uint32>("VerySlowXpGain.ItemRewardAmount", 1);
             sChallengeModes->questXpOnlyItemRewardAmount      = sConfigMgr->GetOption<uint32>("QuestXpOnly.ItemRewardAmount", 1);
             sChallengeModes->ironManItemRewardAmount          = sConfigMgr->GetOption<uint32>("IronMan.ItemRewardAmount", 1);
+            sChallengeModes->ironManEnhancedItemRewardAmount  = sConfigMgr->GetOption<uint32>("IronManEnhanced.ItemRewardAmount", 1);
 
             LoadStringToMap(sChallengeModes->hardcoreAchievementReward, sConfigMgr->GetOption<std::string>("Hardcore.AchievementReward", ""));
             LoadStringToMap(sChallengeModes->semiHardcoreAchievementReward, sConfigMgr->GetOption<std::string>("SemiHardcore.AchievementReward", ""));
@@ -333,6 +352,7 @@ private:
             LoadStringToMap(sChallengeModes->verySlowXpGainAchievementReward, sConfigMgr->GetOption<std::string>("VerySlowXpGain.AchievementReward", ""));
             LoadStringToMap(sChallengeModes->questXpOnlyAchievementReward, sConfigMgr->GetOption<std::string>("QuestXpOnly.AchievementReward", ""));
             LoadStringToMap(sChallengeModes->ironManAchievementReward, sConfigMgr->GetOption<std::string>("IronMan.AchievementReward", ""));
+            LoadStringToMap(sChallengeModes->ironManEnhancedAchievementReward, sConfigMgr->GetOption<std::string>("IronManEnhanced.AchievementReward", ""));
         }
     }
 };
@@ -696,9 +716,7 @@ public:
             return true;
         }
 
-        // 当启用铁人增强模式时，附魔白名单由 ChallengeMode_IronMan_Enhanced 处理；
-        // 否则保持上游 IronMan 行为，禁止所有附魔。
-        return sChallengeModes->ironManEnhancedEnable;
+        return false;
     }
 
     void OnPlayerLearnSpell(Player* player, uint32 spellID) override
@@ -845,11 +863,11 @@ public:
         {
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "启用任务经验专属模式", 0, SETTING_QUEST_XP_ONLY);
         }
-        if (sChallengeModes->challengeEnabled(SETTING_IRON_MAN) && sChallengeModes->ironManEnhancedEnable &&
-            !playerSettingEnabled(player, SETTING_IRON_MAN) && !playerSettingEnabled(player, SETTING_SELF_CRAFTED))
+        if (sChallengeModes->challengeEnabled(SETTING_IRON_MAN_ENHANCED) &&
+            !player->HasItemCount(HARDCORE_TOKEN_ITEM_ID, 1, true) && !playerSettingEnabled(player, SETTING_SELF_CRAFTED))
         {
             // 使用铁人模式实现“硬核挑战模式”
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_IRON_MAN,
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "开始硬核挑战模式", 0, SETTING_IRON_MAN_ENHANCED,
                 "选择开启硬核挑战模式，系统将销毁当前已装备的各种装备。\n"
                 "你确定要继续吗？\n\n", 0, false);
         }
@@ -866,15 +884,13 @@ public:
             return false;
         }
 
-        player->UpdatePlayerSetting("mod-challenge-modes", action, 1);
-
-        if (action == SETTING_IRON_MAN && sChallengeModes->ironManEnhancedEnable)
+        if (action == SETTING_IRON_MAN_ENHANCED && sChallengeModes->challengeEnabled(SETTING_IRON_MAN_ENHANCED))
         {
             ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式开启。");
 
             ChallengeMode_IronMan_Enhanced::InitializeProgress(player);
 
-            if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_IRON_MAN, player))
+            if (!sChallengeModes->challengeEnabledCheckbyToken(SETTING_IRON_MAN_ENHANCED, player))
             {
                 player->AddItem(HARDCORE_TOKEN_ITEM_ID, 1);
 
@@ -901,6 +917,7 @@ public:
         }
         else
         {
+            player->UpdatePlayerSetting("mod-challenge-modes", action, 1);
             ChatHandler(player->GetSession()).PSendSysMessage("挑战模式已启用。");
         }
 

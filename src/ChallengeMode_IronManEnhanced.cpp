@@ -125,7 +125,8 @@ void ChallengeMode_IronMan_Enhanced::OnPlayerReleasedGhost(Player* player)
         return;
     }
 
-    LOG_INFO("entities.player", "IronManEnhanced: kicking {} after releasing ghost", player->GetName());
+    LOG_INFO("entities.player", "IronManEnhanced: banning and kicking {} after releasing ghost", player->GetName());
+    BanCharacter(player);
     player->GetSession()->KickPlayer("硬核挑战角色已死亡");
 }
 
@@ -220,11 +221,9 @@ void ChallengeMode_IronMan_Enhanced::OnPlayerLogin(Player* player)
 
     if (!alive)
     {
-        LOG_INFO("entities.player", "IronManEnhanced: login with token but dead for {}; recording failure and kicking",
+        LOG_INFO("entities.player", "IronManEnhanced: login with token but dead for {}; kicking",
             player->GetName());
 
-        RecordFailure(player);
-        DeleteProgress(player);
         player->GetSession()->KickPlayer("硬核挑战角色已死亡");
         return;
     }
@@ -622,8 +621,6 @@ void ChallengeMode_IronMan_Enhanced::RecordFailure(Player* player, char const* r
         reason, player->GetMapId(), player->GetZoneId(), player->GetAreaId(),
         player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(),
         killerInfo, player->GetTotalPlayedTime());
-
-    BanCharacter(player);
 
     if (strcmp(reason, "resurrect") == 0)
     {

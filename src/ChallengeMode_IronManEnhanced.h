@@ -31,10 +31,6 @@ public:
         bool /*ignore_condition*/) override;
     bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/,
         Item* item, bool /*swap*/, bool /*not_loading*/) override;
-    bool OnPlayerCanSendMail(Player* player, ObjectGuid /*receiverGuid*/,
-        ObjectGuid /*mailbox*/, std::string& /*subject*/, std::string& /*body*/,
-        uint32 /*money*/, uint32 /*COD*/, Item* /*item*/) override;
-    bool OnPlayerCanInitTrade(Player* player, Player* /*target*/) override;
     bool OnPlayerCanGroupInvite(Player* player, std::string& /*membername*/) override;
     bool OnPlayerCanGroupAccept(Player* player, Group* /*group*/) override;
     bool OnPlayerCanJoinLfg(Player* player, uint8 /*roles*/,

@@ -280,19 +280,6 @@ bool ChallengeMode_IronMan_Enhanced::OnPlayerCanApplyEnchantment(Player* player,
     return false;
 }
 
-bool ChallengeMode_IronMan_Enhanced::OnPlayerCanSendMail(Player* player,
-    ObjectGuid /*receiverGuid*/, ObjectGuid /*mailbox*/, std::string& /*subject*/,
-    std::string& /*body*/, uint32 /*money*/, uint32 /*COD*/, Item* /*item*/)
-{
-    if (!IsEnhancedActive(player))
-    {
-        return true;
-    }
-
-    ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法发送邮件。");
-    return false;
-}
-
 bool ChallengeMode_IronMan_Enhanced::OnPlayerCanJoinLfg(Player* player,
     uint8 /*roles*/, std::set<uint32>& /*dungeons*/, const std::string& /*comment*/)
 {
@@ -328,21 +315,6 @@ bool ChallengeMode_IronMan_Enhanced::OnPlayerCanJoinInArenaQueue(Player* player,
     }
 
     ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法进入竞技场。");
-    return false;
-}
-
-bool ChallengeMode_IronMan_Enhanced::OnPlayerCanInitTrade(Player* player,
-    Player* target)
-{
-    bool playerHardcore = IsEnhancedActive(player);
-    bool targetHardcore = target && IsEnhancedActive(target);
-
-    if (!playerHardcore && !targetHardcore)
-    {
-        return true;
-    }
-
-    ChatHandler(player->GetSession()).PSendSysMessage("硬核挑战模式下无法进行交易。");
     return false;
 }
 
